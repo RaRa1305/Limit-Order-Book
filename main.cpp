@@ -23,7 +23,7 @@ class OrderBook
 {
 private:
     std::unordered_map<uint64_t, Order> OrderList;
-    std::map<int64_t, std::deque<uint64_t>, std::greater<uint64_t>> Bids;
+    std::map<int64_t, std::deque<uint64_t>, std::greater<int64_t>> Bids;
     std::map < int64_t, std::deque<uint64_t>> Asks;
 };
 
