@@ -1,4 +1,9 @@
 #include <cstdint>
+#include <unordered_map>
+#include <map>
+#include <deque>
+#include <vector>
+#include <algorithm>
 
 enum class OrderType
 {
@@ -8,10 +13,18 @@ enum class OrderType
 
 struct Order
 {
-    std::uint64_t ID;
-    std::int64_t Price;
-    std::uint64_t Quantity;
+    uint64_t ID;
+    int64_t Price;
+    uint64_t Quantity;
     OrderType Ordertype;
+};
+
+class OrderBook
+{
+private:
+    std::unordered_map<uint64_t, Order> OrderList;
+    std::map<int64_t, std::deque<uint64_t>, std::greater<uint64_t>> Bids;
+    std::map < int64_t, std::deque<uint64_t>> Asks;
 };
 
 int main()
