@@ -1,23 +1,11 @@
+#pragma once
 #include <cstdint>
 #include <unordered_map>
 #include <map>
 #include <deque>
 #include <vector>
 #include <algorithm>
-
-enum class OrderType
-{
-    Buy,
-    Sell
-};
-
-struct Order
-{
-    uint64_t ID;
-    int64_t Price;
-    uint64_t Quantity;
-    OrderType Ordertype;
-};
+#include "Types.h"
 
 class OrderBook
 {
@@ -38,15 +26,29 @@ public:
             if (buy_order.Price < best_ask_price)
                 break;
 
-            else
+            while (!ask_queue.empty() && buy_order.Quantity > 0) 
             {
-                int64_t ask_id = ask_queue.front();
-                uint64_t fulfill_qty = std::min(OrderList[ask_id].Quantity, buy_order.Quantity);
-                OrderList[ask_id].Quantity -= fulfill_qty;
-                buy_order.Quantity -= fulfill_qty;
+                uint64_t ask_id = ask_queue.front();
+                auto it = OrderList.find(ask_id);
 
-                if (OrderList[ask_id].Quantity == 0)
+                if (it != OrderList.end())
+                {
+                    Order& resting_ask = it->second;
+                    uint64_t fulfill_qty = std::min(resting_ask.Quantity, buy_order.Quantity);
+                    
+                    resting_ask.Quantity -= fulfill_qty;
+                    buy_order.Quantity -= fulfill_qty;
+
+                    if (resting_ask.Quantity == 0)
+                    {
+                        ask_queue.pop_front();
+                        OrderList.erase(ask_id);
+                    }
+                }
+                else 
+                {
                     ask_queue.pop_front();
+                }
             }
 
             if (ask_queue.empty())
@@ -65,15 +67,29 @@ public:
             if (sell_order.Price > best_bid_price)
                 break;
 
-            else
+            while (!bid_queue.empty() && sell_order.Quantity > 0) 
             {
-                int64_t bid_id = bid_queue.front();
-                uint64_t fulfill_qty = std::min(OrderList[bid_id].Quantity, sell_order.Quantity);
-                OrderList[bid_id].Quantity -= fulfill_qty;
-                sell_order.Quantity -= fulfill_qty;
+                uint64_t bid_id = bid_queue.front();
+                auto it = OrderList.find(bid_id);
 
-                if (OrderList[bid_id].Quantity == 0)
-                    bid_queue.pop_front();
+                if (it != OrderList.end())
+                {
+                    Order& resting_bid = it->second;
+                    uint64_t fulfill_qty = std::min(resting_bid.Quantity, sell_order.Quantity);
+                    
+                    resting_bid.Quantity -= fulfill_qty;
+                    sell_order.Quantity -= fulfill_qty;
+
+                    if (resting_bid.Quantity == 0)
+                    {
+                        bid_queue.pop_front();
+                        OrderList.erase(bid_id);
+                    }
+                }
+                else 
+                {
+                    bid_queue.pop_front();//Support for O(1) cancellation
+                }
             }
 
             if (bid_queue.empty())
@@ -81,7 +97,7 @@ public:
         }
     }
 
-    void add_order(Order &order)
+    void add_order(Order order)
     {
         if (order.Ordertype == OrderType::Buy)
             match_buy(order);
@@ -98,8 +114,3 @@ public:
         }
     }
 };
-
-int main()
-{
-    return 0;
-}
