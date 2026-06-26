@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -std=c++17 -O3 -march=native -DNDEBUG -Iinclude
+CXXFLAGS = -std=c++17 -O3 -march=native -Iinclude
 LDFLAGS = -lbenchmark -lpthread
 
 MAIN_OUT = build/OrderBookEngine
