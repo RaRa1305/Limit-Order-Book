@@ -16,15 +16,17 @@ private:
 
 public:
     // Helpers for testing
-    bool has_order(uint64_t id) const {
+    bool has_order(uint64_t id) const
+    {
         return OrderList.find(id) != OrderList.end();
     }
 
-    Order get_order(uint64_t id) const {
+    Order get_order(uint64_t id) const
+    {
         return OrderList.at(id);
     }
 
-    //Main functions 
+    // Main functions
     bool can_fill(Order &order)
     {
         uint64_t total_qty = 0;
@@ -157,7 +159,10 @@ public:
         if (order.Category == OrderCategory::Market)
         {
             order.Price = (order.Ordertype == OrderType::Buy) ? 1000000000 : 0;
-            order.TIF = TimeInForce::IOC;
+            if (order.TIF != TimeInForce::FOK)
+            {
+                order.TIF = TimeInForce::IOC;
+            }
         }
 
         if (order.TIF == TimeInForce::FOK)
@@ -182,5 +187,10 @@ public:
             else
                 Asks[order.Price].push_back(order.ID);
         }
+    }
+
+    void cancel_order(uint64_t id)
+    {
+        OrderList.erase(id); // O(1) deletion
     }
 };
