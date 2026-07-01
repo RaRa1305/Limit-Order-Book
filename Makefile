@@ -1,6 +1,6 @@
 CXX = g++
-CXXFLAGS = -std=c++17 -O3 -march=native -Iinclude
-LDFLAGS = -lbenchmark -lpthread
+CXXFLAGS = -std=c++17 -O3 -march=native -Iinclude -I/usr/local/include
+LDFLAGS = -L/usr/local/lib -lbenchmark -lpthread
 
 MAIN_OUT = build/OrderBookEngine
 BENCH_OUT = build/BenchEngine

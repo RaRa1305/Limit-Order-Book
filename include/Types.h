@@ -22,10 +22,10 @@ enum class OrderCategory : uint8_t
 
 struct Order
 {
-    uint64_t ID;
-    int64_t Price;
-    uint64_t Quantity;
-    OrderType Ordertype;
-    TimeInForce TIF;
-    OrderCategory Category;
+    uint64_t ID = 0;
+    int64_t Price = 0;
+    uint64_t Quantity = 0;
+    OrderType Ordertype = OrderType::Buy;
+    TimeInForce TIF = TimeInForce::GTC;
+    OrderCategory Category = OrderCategory::Limit;
 };

@@ -1,6 +1,6 @@
 #pragma once
 #include <cstdint>
-#include <unordered_map>
+#include "robin_hood.h"
 #include <map>
 #include <deque>
 #include <vector>
@@ -10,7 +10,7 @@
 class OrderBook
 {
 private:
-    std::unordered_map<uint64_t, Order> OrderList;
+    robin_hood::unordered_flat_map<uint64_t, Order> OrderList;
     std::map<int64_t, std::deque<uint64_t>, std::greater<int64_t>> Bids;
     std::map<int64_t, std::deque<uint64_t>> Asks;
 
