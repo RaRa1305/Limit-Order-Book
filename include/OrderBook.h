@@ -2,17 +2,45 @@
 #include <cstdint>
 #include "robin_hood.h"
 #include <map>
-#include <deque>
-#include <vector>
 #include <algorithm>
 #include "Types.h"
+#include "MemoryPool.h"
 
 class OrderBook
 {
 private:
-    robin_hood::unordered_flat_map<uint64_t, Order> OrderList;
-    std::map<int64_t, std::deque<uint64_t>, std::greater<int64_t>> Bids;
-    std::map<int64_t, std::deque<uint64_t>> Asks;
+    OrderMemoryPool memory_pool;
+    robin_hood::unordered_flat_map<uint64_t, uint32_t> OrderList;
+    std::map<int64_t, PriceLevel, std::greater<int64_t>> Bids;
+    std::map<int64_t, PriceLevel> Asks;
+
+    void list_push_back(PriceLevel &level, uint32_t idx)
+    {
+        Node &n = memory_pool[idx];
+        n.prev = level.tail;
+        n.next = NULL_REF;
+
+        if (level.tail != NULL_REF)
+            memory_pool[level.tail].next = idx;
+        else
+            level.head = idx;
+
+        level.tail = idx;
+    }
+
+    void list_remove(PriceLevel &level, uint32_t idx)
+    {
+        Node &n = memory_pool[idx];
+        if (n.prev != NULL_REF)
+            memory_pool[n.prev].next = n.next;
+        else
+            level.head = n.next;
+
+        if (n.next != NULL_REF)
+            memory_pool[n.next].prev = n.prev;
+        else
+            level.tail = n.prev;
+    }
 
 public:
     // Helpers for testing
@@ -23,7 +51,7 @@ public:
 
     Order get_order(uint64_t id) const
     {
-        return OrderList.at(id);
+        return memory_pool[OrderList.at(id)].order;
     }
 
     // Main functions
@@ -37,15 +65,11 @@ public:
                 if (price > order.Price)
                     break;
 
-                for (uint64_t id : queue)
+                for (uint32_t idx = queue.head; idx != NULL_REF; idx = memory_pool[idx].next)
                 {
-                    auto it = OrderList.find(id);
-                    if (it != OrderList.end())
-                    {
-                        total_qty += it->second.Quantity;
-                        if (total_qty >= order.Quantity)
-                            return true;
-                    }
+                    total_qty += memory_pool[idx].order.Quantity;
+                    if (total_qty >= order.Quantity)
+                        return true;
                 }
             }
             return false;
@@ -57,15 +81,11 @@ public:
                 if (price < order.Price)
                     break;
 
-                for (uint64_t id : queue)
+                for (uint32_t idx = queue.head; idx != NULL_REF; idx = memory_pool[idx].next)
                 {
-                    auto it = OrderList.find(id);
-                    if (it != OrderList.end())
-                    {
-                        total_qty += it->second.Quantity;
-                        if (total_qty >= order.Quantity)
-                            return true;
-                    }
+                    total_qty += memory_pool[idx].order.Quantity;
+                    if (total_qty >= order.Quantity)
+                        return true;
                 }
             }
             return false;
@@ -83,32 +103,24 @@ public:
             if (buy_order.Price < best_ask_price)
                 break;
 
-            while (!ask_queue.empty() && buy_order.Quantity > 0)
+            while (ask_queue.head != NULL_REF && buy_order.Quantity > 0)
             {
-                uint64_t ask_id = ask_queue.front();
-                auto it = OrderList.find(ask_id);
+                uint32_t idx = ask_queue.head;
+                Node &n = memory_pool[idx];
+                uint64_t fulfill_qty = std::min(n.order.Quantity, buy_order.Quantity);
 
-                if (it != OrderList.end())
-                {
-                    Order &resting_ask = it->second;
-                    uint64_t fulfill_qty = std::min(resting_ask.Quantity, buy_order.Quantity);
+                n.order.Quantity -= fulfill_qty;
+                buy_order.Quantity -= fulfill_qty;
 
-                    resting_ask.Quantity -= fulfill_qty;
-                    buy_order.Quantity -= fulfill_qty;
-
-                    if (resting_ask.Quantity == 0)
-                    {
-                        ask_queue.pop_front();
-                        OrderList.erase(ask_id);
-                    }
-                }
-                else
-                {
-                    ask_queue.pop_front();
+                if(n.order.Quantity == 0){
+                    uint64_t ask_id = n.order.ID;
+                    list_remove(ask_queue,idx);
+                    OrderList.erase(ask_id);
+                    memory_pool.free_node(idx);
                 }
             }
 
-            if (ask_queue.empty())
+            if (ask_queue.head == NULL_REF)
                 Asks.erase(best_ask_price);
         }
     }
@@ -124,32 +136,24 @@ public:
             if (sell_order.Price > best_bid_price)
                 break;
 
-            while (!bid_queue.empty() && sell_order.Quantity > 0)
+            while (bid_queue.head != NULL_REF && sell_order.Quantity > 0)
             {
-                uint64_t bid_id = bid_queue.front();
-                auto it = OrderList.find(bid_id);
+                uint32_t idx = bid_queue.head;
+                Node& n = memory_pool[idx];
+                uint64_t fulfill_qty = std::min(n.order.Quantity,sell_order.Quantity);
 
-                if (it != OrderList.end())
-                {
-                    Order &resting_bid = it->second;
-                    uint64_t fulfill_qty = std::min(resting_bid.Quantity, sell_order.Quantity);
+                n.order.Quantity -= fulfill_qty;
+                sell_order.Quantity -= fulfill_qty;
 
-                    resting_bid.Quantity -= fulfill_qty;
-                    sell_order.Quantity -= fulfill_qty;
-
-                    if (resting_bid.Quantity == 0)
-                    {
-                        bid_queue.pop_front();
-                        OrderList.erase(bid_id);
-                    }
-                }
-                else
-                {
-                    bid_queue.pop_front(); // Support for O(1) cancellation
+                if(n.order.Quantity == 0){
+                    uint64_t ask_id = n.order.ID;
+                    list_remove(bid_queue,idx);
+                    OrderList.erase(ask_id);
+                    memory_pool.free_node(idx);
                 }
             }
 
-            if (bid_queue.empty())
+            if (bid_queue.head == NULL_REF)
                 Bids.erase(best_bid_price);
         }
     }
@@ -180,17 +184,41 @@ public:
 
         if (order.Quantity > 0 && order.TIF == TimeInForce::GTC)
         {
-            OrderList.insert({order.ID, order});
+            uint32_t idx = memory_pool.alloc_node(order);
+            OrderList[order.ID] = idx;
 
             if (order.Ordertype == OrderType::Buy)
-                Bids[order.Price].push_back(order.ID);
+                list_push_back(Bids[order.Price], idx);
             else
-                Asks[order.Price].push_back(order.ID);
+                list_push_back(Asks[order.Price], idx);
         }
     }
 
     void cancel_order(uint64_t id)
     {
-        OrderList.erase(id); // O(1) deletion
+        auto it = OrderList.find(id);
+        if (it == OrderList.end())
+            return;
+
+        uint32_t idx = it->second;
+        Order &order = memory_pool[idx].order;
+
+        if (order.Ordertype == OrderType::Buy)
+        {
+            auto lvl = Bids.find(order.Price);
+            list_remove(lvl->second, idx);
+            if (lvl->second.head == NULL_REF)
+                Bids.erase(lvl);
+        }
+        else
+        {
+            auto lvl = Asks.find(order.Price);
+            list_remove(lvl->second, idx);
+            if (lvl->second.head == NULL_REF)
+                Asks.erase(lvl);
+        }
+
+        OrderList.erase(it);
+        memory_pool.free_node(idx);
     }
 };
