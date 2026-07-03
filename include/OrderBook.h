@@ -13,6 +13,7 @@ private:
     robin_hood::unordered_flat_map<uint64_t, uint32_t> OrderList;
     std::map<int64_t, PriceLevel, std::greater<int64_t>> Bids;
     std::map<int64_t, PriceLevel> Asks;
+    uint64_t internal_id = 1;
 
     void list_push_back(PriceLevel &level, uint32_t idx)
     {
@@ -112,9 +113,10 @@ public:
                 n.order.Quantity -= fulfill_qty;
                 buy_order.Quantity -= fulfill_qty;
 
-                if(n.order.Quantity == 0){
+                if (n.order.Quantity == 0)
+                {
                     uint64_t ask_id = n.order.ID;
-                    list_remove(ask_queue,idx);
+                    list_remove(ask_queue, idx);
                     OrderList.erase(ask_id);
                     memory_pool.free_node(idx);
                 }
@@ -139,15 +141,16 @@ public:
             while (bid_queue.head != NULL_REF && sell_order.Quantity > 0)
             {
                 uint32_t idx = bid_queue.head;
-                Node& n = memory_pool[idx];
-                uint64_t fulfill_qty = std::min(n.order.Quantity,sell_order.Quantity);
+                Node &n = memory_pool[idx];
+                uint64_t fulfill_qty = std::min(n.order.Quantity, sell_order.Quantity);
 
                 n.order.Quantity -= fulfill_qty;
                 sell_order.Quantity -= fulfill_qty;
 
-                if(n.order.Quantity == 0){
+                if (n.order.Quantity == 0)
+                {
                     uint64_t ask_id = n.order.ID;
-                    list_remove(bid_queue,idx);
+                    list_remove(bid_queue, idx);
                     OrderList.erase(ask_id);
                     memory_pool.free_node(idx);
                 }
@@ -158,8 +161,9 @@ public:
         }
     }
 
-    void add_order(Order order)
+    uint64_t add_order(Order order)
     {
+        order.ID = internal_id++;
         if (order.Category == OrderCategory::Market)
         {
             order.Price = (order.Ordertype == OrderType::Buy) ? 1000000000 : 0;
@@ -173,7 +177,7 @@ public:
         {
             if (!can_fill(order))
             {
-                return;
+                return 0;
             }
         }
 
@@ -192,6 +196,8 @@ public:
             else
                 list_push_back(Asks[order.Price], idx);
         }
+
+        return order.ID;
     }
 
     void cancel_order(uint64_t id)
