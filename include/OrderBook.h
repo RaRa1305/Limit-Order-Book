@@ -5,14 +5,15 @@
 #include <algorithm>
 #include "Types.h"
 #include "MemoryPool.h"
+#include "absl/container/btree_map.h"
 
 class OrderBook
 {
 private:
     OrderMemoryPool memory_pool;
     robin_hood::unordered_flat_map<uint64_t, uint32_t> OrderList;
-    std::map<int64_t, PriceLevel, std::greater<int64_t>> Bids;
-    std::map<int64_t, PriceLevel> Asks;
+    absl::btree_map<int64_t, PriceLevel, std::greater<int64_t>> Bids;
+    absl::btree_map<int64_t, PriceLevel> Asks;
     uint64_t internal_id = 1;
 
     void list_push_back(PriceLevel &level, uint32_t idx)
@@ -44,6 +45,12 @@ private:
     }
 
 public:
+
+    OrderBook(size_t expected_capacity = 0) : memory_pool(expected_capacity) {
+        if (expected_capacity > 0) {
+            OrderList.reserve(expected_capacity);
+        }
+    }
     // Helpers for testing
     bool has_order(uint64_t id) const
     {
@@ -123,7 +130,7 @@ public:
             }
 
             if (ask_queue.head == NULL_REF)
-                Asks.erase(best_ask_price);
+                Asks.erase(best_ask);
         }
     }
 
@@ -157,7 +164,7 @@ public:
             }
 
             if (bid_queue.head == NULL_REF)
-                Bids.erase(best_bid_price);
+                Bids.erase(best_bid);
         }
     }
 

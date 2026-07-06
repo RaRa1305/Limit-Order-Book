@@ -7,7 +7,7 @@ static void BM_MatchingEngine(benchmark::State &state)
     {
         state.PauseTiming();
 
-        OrderBook book;
+        OrderBook book(10000);
         for (uint64_t i = 1; i <= 10000; ++i)
         {
             book.add_order({i, static_cast<int64_t>(100 + (i % 50)), 10, OrderType::Sell, TimeInForce::GTC, OrderCategory::Limit});
